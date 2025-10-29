@@ -1,0 +1,10 @@
+services:
+  dimma:
+    build:
+      context: .
+    container_name: dimma
+    restart: unless-stopped
+    ports:
+      - "3339:3339"
+    env_file:
+      - .env

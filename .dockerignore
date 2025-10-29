@@ -1,0 +1,13 @@
+.git
+.cache
+.env
+.env.*
+coverage
+dist
+logs
+node_modules
+out
+*.lcov
+*.log
+*.tgz
+*.tsbuildinfo

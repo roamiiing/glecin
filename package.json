@@ -1,0 +1,21 @@
+{
+    "name": "dimma",
+    "module": "index.ts",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "start": "bun run src/main.ts",
+        "watch": "bun run --watch src/main.ts"
+    },
+    "devDependencies": {
+        "@types/bun": "latest"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    },
+    "dependencies": {
+        "axios": "^1.12.2",
+        "grammy": "^1.38.3",
+        "happy-dom": "^20.0.8"
+    }
+}
