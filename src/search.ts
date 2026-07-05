@@ -1,12 +1,11 @@
 import { promisify } from 'util'
-import { exec, execFile } from 'child_process'
-import { readFile } from 'fs/promises'
+import { execFile } from 'child_process'
+import { mkdtemp, readFile, rm } from 'fs/promises'
 
 import { tmpdir } from 'os'
 import path from 'path'
 import { existsSync } from 'fs'
 
-const execAsync = promisify(exec)
 const execFileAsync = promisify(execFile)
 
 const YOUTUBE_SEARCH_RESULT_COUNT = 10
@@ -196,51 +195,56 @@ export async function getYoutubePlaylistVideos(playlistId: string, limit = YOUTU
 
 export async function getYoutubeVideo(videoId: string): Promise<YoutubeVideo | null> {
     videoId = videoId.trim()
+    if (!YOUTUBE_VIDEO_ID_PATTERN.test(videoId)) {
+        return null
+    }
 
     const url = new URL('https://www.youtube.com/watch')
     url.searchParams.set('v', videoId)
 
-    const tmpDirPath = tmpdir()
+    const tmpDirPath = await mkdtemp(path.join(tmpdir(), 'dimma-ytdlp-'))
 
     try {
-        await execAsync(`yt-dlp ${url.toString()} --write-info-json --skip-download -o "%(id)s.%(ext)s"`, {
+        await execFileAsync('yt-dlp', [url.toString(), '--write-info-json', '--skip-download', '-o', '%(id)s.%(ext)s'], {
             cwd: tmpDirPath,
         })
+
+        const infoJsonPath = path.join(tmpDirPath, `${videoId}.info.json`)
+
+        if (!existsSync(infoJsonPath)) {
+            return null
+        }
+
+        let jsonText
+        try {
+            jsonText = await readFile(infoJsonPath, 'utf-8')
+        } catch (error) {
+            console.error(error)
+            return null
+        }
+
+        let json
+        try {
+            json = JSON.parse(jsonText)
+        } catch (error) {
+            console.error(error)
+            return null
+        }
+
+        if (!json || !json['title'] || !json['duration']) {
+            return null
+        }
+
+        return {
+            videoId,
+            title: json['title'],
+            duration: json['duration'] * 1000,
+            viewCount: json['view_count'],
+        }
     } catch (error) {
         console.error(error)
         return null
-    }
-
-    const infoJsonPath = path.join(tmpDirPath, `${videoId}.info.json`)
-
-    if (!existsSync(infoJsonPath)) {
-        return null
-    }
-
-    let jsonText
-    try {
-        jsonText = await readFile(infoJsonPath, 'utf-8')
-    } catch (error) {
-        console.error(error)
-        return null
-    }
-
-    let json
-    try {
-        json = JSON.parse(jsonText)
-    } catch (error) {
-        console.error(error)
-        return null
-    }
-
-    if (!json || !json['title'] || !json['duration']) {
-        return null
-    }
-
-    return {
-        videoId,
-        title: json['title'],
-        duration: json['duration'] * 1000,
-        viewCount: json['view_count'],
+    } finally {
+        await rm(tmpDirPath, { recursive: true, force: true })
     }
 }
