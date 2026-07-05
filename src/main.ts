@@ -9,9 +9,14 @@ import { getHelpString } from './help'
 import { qrCodeBytes } from './qr'
 
 const token = Bun.env.TOKEN
+const tvIp = Bun.env.TV_IP
 
 if (!token) {
     throw new Error('TOKEN is required')
+}
+
+if (!tvIp) {
+    throw new Error('TV_IP is required')
 }
 
 const bot = new Bot(token)
@@ -21,7 +26,7 @@ const queue = new Queue()
 listenAuthServer(bot.api)
 
 queue.registerEvaluation(async (item) => {
-    await sendToTv('192.168.1.38', {
+    await sendToTv(tvIp, {
         data: 'https://youtu.be/' + item.video.videoId,
         pkg: 'org.smarttube.stable',
     })

@@ -4,7 +4,14 @@ import { getHelpString } from './help'
 const AUTHORIZED_CHATS: Set<number> = new Set()
 
 export function getAuthLink(chatId: number) {
-    return `http://192.168.1.73:3339/?chatId=${chatId}`
+    const authBaseUrl = Bun.env.AUTH_BASE_URL
+    if (!authBaseUrl) {
+        throw new Error('AUTH_BASE_URL is required')
+    }
+
+    const url = new URL(authBaseUrl)
+    url.searchParams.set('chatId', chatId.toString())
+    return url.toString()
 }
 
 export function isAuthorized(chatId: number) {
