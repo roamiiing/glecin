@@ -2,7 +2,11 @@ import { escapeAll } from './escape'
 import { getAuthLink, isAuthorized } from './auth'
 
 const COMMANDS: { command: string; description: string; example?: string }[] = [
-    { command: 'play', description: 'Воспроизвести видео. Можно отправить ссылку на YouTube, либо поисковый запрос обычным сообщением', example: 'dj арбуз' },
+    {
+        command: 'play',
+        description: 'Воспроизвести видео. Можно отправить ссылку на YouTube, ссылку на плейлист или поисковый запрос обычным сообщением',
+        example: 'dj арбуз',
+    },
     { command: 'skip', description: 'Пропустить текущее видео' },
     { command: 'pop', description: 'Убрать из очереди последнее добавленное видео' },
     { command: 'queue', description: 'Показать очередь' },

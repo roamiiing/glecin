@@ -1,9 +1,9 @@
 import { Bot, Composer, InputFile, type Middleware } from 'grammy'
-import { getYoutubeVideo, searchYoutube } from './search'
+import { getYoutubePlaylistVideos, getYoutubeVideo, searchYoutube } from './search'
 import { escapeAll } from './escape'
 import { Queue } from './queue'
 import { sendToTv } from './atsApi'
-import { getVideoId } from './youtube'
+import { getPlaylistId, getVideoId } from './youtube'
 import { authMiddleware, listenAuthServer } from './auth'
 import { getHelpString } from './help'
 import { qrCodeBytes } from './qr'
@@ -84,16 +84,63 @@ const play: Middleware = async (ctx) => {
         return await ctx.reply('Напиши название видео или ссылку, например: <code>/play сигма бой</code>', { parse_mode: 'HTML' })
     }
 
-    const repliedMessage = await ctx.reply(`<code>[👀]</code> Уже ищу: ${escapeAll(query)}`, { parse_mode: 'HTML' })
+    const lookupText = [query, ...getMessageUrls(ctx.message)].join(' ')
+    const videoId = getVideoId(lookupText)
+    const playlistId = videoId ? null : getPlaylistId(lookupText)
+    const statusText = videoId
+        ? `<code>[👀]</code> Получаю метаданные видео: ${escapeAll(query)}`
+        : playlistId
+          ? `<code>[👀]</code> Получаю метаданные плейлиста: ${escapeAll(query)}`
+          : `<code>[👀]</code> Уже ищу: ${escapeAll(query)}`
+    const repliedMessage = await ctx.reply(statusText, { parse_mode: 'HTML' })
 
-    const videoId = getVideoId([query, ...getMessageUrls(ctx.message)].join(' '))
+    const user = {
+        telegramChatId: ctx.chat.id,
+        nickname: ctx.from?.username ?? ctx.from?.first_name ?? 'Мефедроновая шлюха',
+    }
 
     let video
     try {
         if (videoId) {
             video = await getYoutubeVideo(videoId)
         } else {
-            video = await searchYoutube(query)
+            if (playlistId) {
+                const playlist = await getYoutubePlaylistVideos(playlistId)
+                if (!playlist) {
+                    return await ctx.api.editMessageText(
+                        ctx.chat.id,
+                        repliedMessage.message_id,
+                        '<code>[🙂‍↔️]</code> Не удалось прочитать плейлист или в нем нет доступных видео',
+                        { parse_mode: 'HTML' },
+                    )
+                }
+
+                for (const playlistVideo of playlist.videos) {
+                    queue.add(playlistVideo, user)
+                }
+
+                const firstVideo = playlist.videos[0]
+                if (!firstVideo) {
+                    return await ctx.api.editMessageText(
+                        ctx.chat.id,
+                        repliedMessage.message_id,
+                        '<code>[🙂‍↔️]</code> Не удалось прочитать плейлист или в нем нет доступных видео',
+                        { parse_mode: 'HTML' },
+                    )
+                }
+
+                return await ctx.api.editMessageText(
+                    ctx.chat.id,
+                    repliedMessage.message_id,
+                    `<code>[✅]</code> Добавил плейлист: ${escapeAll(playlist.title || playlist.playlistId)}
+Видео: ${playlist.videos.length} из 20
+Первое: https://youtu.be/${firstVideo.videoId}
+${escapeAll(firstVideo.title)}`,
+                    { parse_mode: 'HTML' },
+                )
+            } else {
+                video = await searchYoutube(query)
+            }
         }
     } catch (error: unknown) {
         await ctx.api.editMessageText(
@@ -110,8 +157,8 @@ const play: Middleware = async (ctx) => {
     }
 
     queue.add(video, {
-        telegramChatId: ctx.chat.id,
-        nickname: ctx.from?.username ?? ctx.from?.first_name ?? 'Мефедроновая шлюха',
+        telegramChatId: user.telegramChatId,
+        nickname: user.nickname,
     })
 
     await ctx.api.editMessageText(
